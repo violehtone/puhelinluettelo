@@ -1,28 +1,23 @@
 import React from 'react';
 import './App.css';
-import axios from 'axios';
 import personService from './services/persons'
 
 class App extends React.Component {
   constructor(props) {
     super(props)
     this.state = {
-      persons: [
-                { name: 'Keijo',
-                  number: '040-42131321'
-                },
-                { name: 'Janne',
-                  number: '050-42131321'
-                },
-                { name: 'Niilo',
-                  number: '020-312532'
-                }
-                ],
+      persons: [],
       newName: '',
       newNumber: '',
       showAll: true,
-      search: ''
+      search: '',
+      notification: ''
     }
+    this.removePerson
+  }
+
+  handleClick() {
+    window.confirm("Are you sure?")
   }
 
   componentWillMount() {
@@ -31,16 +26,8 @@ class App extends React.Component {
       .then(response => {
         this.setState({persons: response.data})
       })
-
-    // axios
-    //   .get('http://localhost:3001/persons')
-    //   .then(response => {
-    //     console.log('promise fulfilled')
-    //     this.setState({ persons: response.data })
-    //   })
   }
   
-
   checkIfNewPerson = (name) => {
     for(var i = 0; i<this.state.persons.length; i++) {
       if(this.state.persons[i].name === name) {
@@ -53,39 +40,79 @@ class App extends React.Component {
 
   addPerson = (event) => {
     event.preventDefault()
+    const newPersonObject = {name: this.state.newName, number: this.state.newNumber}
+    const personObject = this.getPersonObject(newPersonObject.name)
 
-    const personObject = {name: this.state.newName, number: this.state.newNumber}
+    {/* Update an existing person */}
+    if(!this.checkIfNewPerson(newPersonObject.name)) {
+      if(window.confirm(newPersonObject.name + ' on jo luettelossa, korvataanko vanha numero uudella?')) {
+        personService
+        .update(personObject.id, newPersonObject)
+        .then(response => {
+          this.setState({
+            newPerson: '',
+            newNumber: '',
+            notification: newPersonObject.name + ' Muutettiin onnistuneesti'
+          })
+        })
+        this.replacePersonNumber(personObject, newPersonObject.number)
+        setTimeout(() => {
+          this.setState({notification: ''})
+        }, 3000)
+    }
 
+    {/* Adding a new person */}
+    }else {
     personService
-      .create(personObject)
+      .create(newPersonObject)
       .then(response => {
         this.setState({
           persons: this.state.persons.concat(response.data),
-          newPerson: ''
+          newPerson: '',
+          newNumber: '',
+          notification: newPersonObject.name + ' Lisättiin onnistuneesti'
         })
-        this.setState({newNumber: ''})
+        this.replacePersonNumber(personObject, newPersonObject.number)
+        setTimeout(() => {
+          this.setState({notification: ''})
+        }, 3000)
       })
-
-    // MYÖS VANHA:
-    // axios.post('http://localhost:3001/persons', personObject)
-    //   .then(response => {
-    //     this.setState({
-    //       persons: this.state.persons.concat(response.data),
-    //       newName: ''
-    //     })
-    //     this.setState({newNumber: ''})
-    //   })
-
-    /* VANHA TAPA TEHDÄ (ei tuu bäkistä):
-    if(this.checkIfNewPerson(this.state.newName)) {
-      const persons = this.state.persons.concat(personObject)
-      this.setState({persons, newName: ''})
-      this.setState({newNumber: ''})
-      }*/
     }
+  }
+
+  deletePerson = (person) => {
+        for(var i = 0; i<this.state.persons.length; i++) {
+          if(this.state.persons[i].name == person.name) {
+            this.state.persons.splice(i, 1)
+          }
+        }
+   }
   
   handlePersonChange = (event) => {
       this.setState({ newName: event.target.value})
+  }
+
+  getPersonObject = (name) => {
+    for(var i = 0; i<this.state.persons.length; i++) {
+      if(this.state.persons[i].name === name) {
+        return this.state.persons[i]
+        break;
+      }
+    }
+    return false
+  }
+
+  Notification = (message, name) => {
+    <div className="notification">
+    </div>
+  }
+
+  replacePersonNumber = (person, newNumber) => {
+    for(var i=0; i<this.state.persons.length; i++) {
+      if(this.state.persons[i].id == person.id) {
+        this.state.persons[i].number = newNumber
+        }
+      }
   }
 
   handleNumberChange = (event) => {
@@ -97,6 +124,11 @@ class App extends React.Component {
     this.setState({showAll: false})
   }
 
+  removePerson = (person) => {
+    const personid = person.id
+    console.log(personid)    
+  }
+
   render() {
     const personsToShow =
         this.state.showAll?
@@ -104,15 +136,36 @@ class App extends React.Component {
         this.state.persons.filter(person => person.name.toLocaleUpperCase().includes(this.state.search.toLocaleUpperCase()))
 
     const personList = personsToShow.map(function(person) {
-      return <li key={person.name}> 
+      return <li key={person.id}> 
                 <span className="personName">{person.name} </span> 
                 <span className="personNumber"> {person.number} </span> 
-                <button onClick="Window.confirm()"> poista </button>
+                <button 
+                  onClick={() =>{if (window.confirm('Poistetaanko ' + person.name)) {
+                                    personService
+                                      .remove(person.id, person)
+                                      .then(response => {})
+                                    }
+                                }
+                          }>
+                  poista
+                </button>
              </li>
     })
 
+    const NotificationBox = ({ message}) => {
+      if (message == '') {
+        return null
+      }
+        return (
+          <div className="notification">
+            {message}
+          </div>
+        )
+    }
+
     return (
       <div id="content">
+        <NotificationBox message={this.state.notification}/>
         <h2>Puhelinluettelo</h2>
         <div>
           rajaa näytettäviä
